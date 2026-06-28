@@ -98,18 +98,21 @@ export function AudioPlayer({ uri, tint, track }: AudioPlayerProps) {
               className="h-full rounded-full"
             />
           </View>
-          <Text style={{ color: tint, fontSize: 11 }}>
-            {formatDuration(position)} / {formatDuration(duration)}
-          </Text>
+          <View className="flex-row items-center justify-between">
+            <Text style={{ color: tint, fontSize: 11 }}>
+              {formatDuration(position)} / {formatDuration(duration)}
+            </Text>
+            <Pressable
+              onPress={cycleRate}
+              accessibilityLabel={`Mudar velocidade para ${playbackRate === 2 ? "1x" : `${playbackRate + 0.5}x`}`}
+              className="rounded-full px-2 py-1"
+              style={{ backgroundColor: track }}
+            >
+              <Text style={{ color: tint, fontSize: 12, fontWeight: "600" }}>{playbackRate}x</Text>
+            </Pressable>
+          </View>
         </View>
       </View>
-      <Pressable
-        onPress={cycleRate}
-        className="self-start rounded-full px-3 py-1"
-        style={{ backgroundColor: track }}
-      >
-        <Text style={{ color: tint, fontSize: 12, fontWeight: "600" }}>{playbackRate}x</Text>
-      </Pressable>
     </View>
   )
 }

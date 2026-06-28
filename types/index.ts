@@ -23,6 +23,15 @@ export interface ContactRequest {
   createdAt: string | null
 }
 
+export interface ConversationState {
+  conversationId: string
+  userId: string
+  unreadCount: number
+  isTyping: boolean
+  isRecording: boolean
+  lastReadAt?: string | null
+}
+
 export type MessageType = "text" | "image" | "audio" | "document"
 
 export interface Message {
@@ -34,6 +43,7 @@ export interface Message {
   // Nome original do arquivo (usado para documentos).
   fileName?: string | null
   createdAt: string | null
-  read?: boolean
+  status: "sent" | "delivered" | "read"
+  deliveredAt?: string | null
   readAt?: string | null
 }

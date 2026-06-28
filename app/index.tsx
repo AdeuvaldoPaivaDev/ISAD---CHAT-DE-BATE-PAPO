@@ -20,7 +20,9 @@ import {
   getContacts,
   getPendingRequests,
   getContactRelationship,
+  listenConversationStates,
   listenConversations,
+  listenUnreadCounts,
   searchUsers,
   sendContactRequest,
   respondToContactRequest,
@@ -47,6 +49,10 @@ export default function ConversationsScreen() {
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<User[]>([])
   const [relationshipMap, setRelationshipMap] = useState<Record<string, ContactRelation>>({})
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({})
+  const [conversationStates, setConversationStates] = useState<
+    Record<string, { [userId: string]: { isTyping: boolean; isRecording: boolean } }>
+  >({})
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null)
 
   const iconColor = theme === "dark" ? ICON_DARK : ICON_LIGHT
@@ -81,6 +87,17 @@ export default function ConversationsScreen() {
     if (!user) return
     return listenConversations(user.id, setConversations)
   }, [user])
+
+  useEffect(() => {
+    if (!user) return
+    return listenUnreadCounts(user.id, setUnreadCounts)
+  }, [user?.id])
+
+  useEffect(() => {
+    if (!user) return
+    const ids = conversations.map((conv) => conv.id)
+    return listenConversationStates(ids, setConversationStates)
+  }, [user?.id, conversations.map((conv) => conv.id).join(",")])
 
   useEffect(() => {
     if (!user || !searchQuery.trim()) {
@@ -333,12 +350,40 @@ export default function ConversationsScreen() {
                     <Text className="flex-1 font-medium text-card-foreground" numberOfLines={1}>
                       {contact.name}
                     </Text>
-                    {conv?.lastMessageAt ? (
-                      <Text className="text-xs text-muted-foreground">{formatTime(conv.lastMessageAt)}</Text>
-                    ) : null}
+                    <View className="flex-row items-center gap-2">
+                      {conv?.lastMessageAt ? (
+                        <Text className="text-xs text-muted-foreground">{formatTime(conv.lastMessageAt)}</Text>
+                      ) : null}
+                      {conv?.id && unreadCounts[conv.id] ? (
+                        <View className="rounded-full bg-destructive px-2 py-0.5">
+                          <Text className="text-[11px] font-semibold text-white">
+                            {unreadCounts[conv.id]}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
                   </View>
-                  <Text className="text-sm text-muted-foreground" numberOfLines={1}>
-                    {conv?.lastMessage || "Toque para conversar"}
+                  <Text
+                    className={
+                      conv &&
+                      conversationStates[conv.id] &&
+                      Object.values(conversationStates[conv.id]).some((state) => state.isTyping || state.isRecording)
+                        ? "text-sm text-primary"
+                        : "text-sm text-muted-foreground"
+                    }
+                    numberOfLines={1}
+                  >
+                    {(() => {
+                      if (!conv) return "Toque para conversar"
+                      const state = conversationStates[conv.id]
+                      if (state) {
+                        const otherUser = Object.keys(state).find((otherId) => otherId !== user?.id)
+                        const otherState = otherUser ? state[otherUser] : undefined
+                        if (otherState?.isRecording) return "Gravando áudio..."
+                        if (otherState?.isTyping) return "Digitando..."
+                      }
+                      return conv.lastMessage || "Toque para conversar"
+                    })()}
                   </Text>
                 </View>
               </Pressable>

@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { View, Text, TextInput, Pressable, ActivityIndicator, Modal } from "react-native"
 import { Send, ImageIcon, Paperclip, Mic, Trash2 } from "lucide-react-native"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
@@ -8,6 +8,8 @@ interface ChatInputProps {
   onAttachImage: () => void
   onAttachDocument: () => void
   onSendAudio: (uri: string) => void
+  onTypingChange?: (isTyping: boolean) => void
+  onRecordingChange?: (isRecording: boolean) => void
   sending: boolean
   iconColor: string
 }
@@ -17,6 +19,8 @@ export function ChatInput({
   onAttachImage,
   onAttachDocument,
   onSendAudio,
+  onTypingChange,
+  onRecordingChange,
   sending,
   iconColor,
 }: ChatInputProps) {
@@ -24,21 +28,33 @@ export function ChatInput({
   const [emojiOpen, setEmojiOpen] = useState(false)
   const { isRecording, start, stop, cancel } = useAudioRecorder()
 
+  useEffect(() => {
+    onRecordingChange?.(isRecording)
+  }, [isRecording, onRecordingChange])
+
+  function updateText(value: string) {
+    setText(value)
+    onTypingChange?.(value.trim().length > 0)
+  }
+
   function handleSend() {
     const trimmed = text.trim()
     if (!trimmed) return
     onSendText(trimmed)
     setText("")
+    onTypingChange?.(false)
   }
 
   async function handleStopRecording() {
     const result = await stop()
+    onRecordingChange?.(false)
     if (result?.uri) onSendAudio(result.uri)
   }
 
   function addEmoji(emoji: string) {
     setText((prev) => prev + emoji)
     setEmojiOpen(false)
+    onTypingChange?.(true)
   }
 
   if (isRecording) {
@@ -93,7 +109,7 @@ export function ChatInput({
 
       <TextInput
         value={text}
-        onChangeText={setText}
+        onChangeText={updateText}
         placeholder="Mensagem"
         placeholderTextColor="rgb(148 163 165)"
         multiline
@@ -114,7 +130,10 @@ export function ChatInput({
         </Pressable>
       ) : (
         <Pressable
-          onPress={start}
+          onPress={async () => {
+            await start()
+            onRecordingChange?.(true)
+          }}
           accessibilityLabel="Gravar áudio"
           className="h-10 w-10 items-center justify-center rounded-full bg-primary active:opacity-80"
         >

@@ -80,6 +80,9 @@ function mapMessage(row: any): Message {
     content: row.content,
     fileName: row.file_name ?? null,
     createdAt: row.created_at ?? null,
+    status: (row.status as "sent" | "delivered" | "read") ?? "sent",
+    deliveredAt: row.delivered_at ?? null,
+    readAt: row.read_at ?? null,
   }
 }
 
@@ -90,6 +93,198 @@ function mapContactRequest(row: any): ContactRequest {
     recipientId: row.recipient_id,
     status: row.status,
     createdAt: row.created_at ?? null,
+  }
+}
+
+export async function getUnreadCounts(userId: string): Promise<Record<string, number>> {
+  const { data: convData, error: convError } = await supabase
+    .from("conversations")
+    .select("id")
+    .contains("participants", [userId])
+
+  if (convError) throw convError
+  const conversationIds = (convData ?? []).map((row: any) => row.id)
+  if (!conversationIds.length) return {}
+
+  const { data, error } = await supabase
+    .from("messages")
+    .select("conversation_id")
+    .neq("sender_id", userId)
+    .neq("status", "read")
+    .in("conversation_id", conversationIds)
+
+  if (error) throw error
+  const counts: Record<string, number> = {}
+  for (const item of data ?? []) {
+    const id = item.conversation_id as string
+    counts[id] = (counts[id] ?? 0) + 1
+  }
+  return counts
+}
+
+export function listenUnreadCounts(userId: string, callback: (counts: Record<string, number>) => void) {
+  const load = async () => {
+    try {
+      const counts = await getUnreadCounts(userId)
+      callback(counts)
+    } catch (error) {
+      console.log("[v0] Erro ao carregar contadores de não lidas:", error)
+    }
+  }
+
+  load()
+
+  const channel = supabase
+    .channel(`unread:${userId}`)
+    .on("postgres_changes", { event: "*", schema: "public", table: "messages" }, () => load())
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
+
+export async function markMessagesDelivered(conversationId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from("messages")
+    .update({ status: "delivered", delivered_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .neq("sender_id", userId)
+    .eq("status", "sent")
+  if (error) throw error
+}
+
+export async function markMessagesRead(conversationId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from("messages")
+    .update({ status: "read", read_at: new Date().toISOString() })
+    .eq("conversation_id", conversationId)
+    .neq("sender_id", userId)
+    .neq("status", "read")
+  if (error) throw error
+}
+
+export async function setTypingStatus(conversationId: string, userId: string, isTyping: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("conversation_states")
+    .upsert(
+      {
+        conversation_id: conversationId,
+        user_id: userId,
+        is_typing: isTyping,
+        is_recording: false,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "conversation_id,user_id" },
+    )
+  if (error) throw error
+}
+
+export async function setRecordingStatus(conversationId: string, userId: string, isRecording: boolean): Promise<void> {
+  const { error } = await supabase
+    .from("conversation_states")
+    .upsert(
+      {
+        conversation_id: conversationId,
+        user_id: userId,
+        is_typing: false,
+        is_recording: isRecording,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "conversation_id,user_id" },
+    )
+  if (error) throw error
+}
+
+export function listenConversationState(
+  conversationId: string,
+  callback: (states: { [userId: string]: { isTyping: boolean; isRecording: boolean } }) => void,
+) {
+  const load = async () => {
+    const { data, error } = await supabase
+      .from("conversation_states")
+      .select("*")
+      .eq("conversation_id", conversationId)
+    if (error) {
+      console.log("[v0] Erro ao carregar estado da conversa:", error.message)
+      return
+    }
+
+    const states: { [userId: string]: { isTyping: boolean; isRecording: boolean } } = {}
+    for (const row of data ?? []) {
+      states[row.user_id] = {
+        isTyping: row.is_typing,
+        isRecording: row.is_recording,
+      }
+    }
+    callback(states)
+  }
+
+  load()
+
+  const channel = supabase
+    .channel(`conversation-state:${conversationId}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "conversation_states", filter: `conversation_id=eq.${conversationId}` },
+      () => load(),
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
+  }
+}
+
+export function listenConversationStates(
+  conversationIds: string[],
+  callback: (states: { [conversationId: string]: { [userId: string]: { isTyping: boolean; isRecording: boolean } } }) => void,
+) {
+  const load = async () => {
+    if (!conversationIds.length) {
+      callback({})
+      return
+    }
+
+    const { data, error } = await supabase
+      .from("conversation_states")
+      .select("*")
+      .in("conversation_id", conversationIds)
+    if (error) {
+      console.log("[v0] Erro ao carregar estados das conversas:", error.message)
+      return
+    }
+
+    const states: { [conversationId: string]: { [userId: string]: { isTyping: boolean; isRecording: boolean } } } = {}
+    for (const row of data ?? []) {
+      states[row.conversation_id] = states[row.conversation_id] ?? {}
+      states[row.conversation_id][row.user_id] = {
+        isTyping: row.is_typing,
+        isRecording: row.is_recording,
+      }
+    }
+    callback(states)
+  }
+
+  load()
+
+  if (!conversationIds.length) {
+    return () => {}
+  }
+
+  const quotedIds = conversationIds.map((id) => `'${id.replace(/'/g, "''")}'`).join(",")
+  const filter = `conversation_id=in.(${quotedIds})`
+  const channel = supabase
+    .channel(`conversation-states:${conversationIds.join(",")}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "conversation_states", filter },
+      () => load(),
+    )
+    .subscribe()
+
+  return () => {
+    supabase.removeChannel(channel)
   }
 }
 
@@ -342,6 +537,7 @@ export async function sendMessage(
     type,
     content,
     file_name: fileName ?? null,
+    status: "sent",
     created_at: new Date().toISOString(),
   })
   if (error) throw error

@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { View, Text, Pressable, Image, Linking, Modal } from "react-native"
-import { FileText, X } from "lucide-react-native"
+import { Check, FileText, X } from "lucide-react-native"
 import { AudioPlayer } from "@/components/audio-player"
 import { formatTime } from "@/lib/format"
 import type { Message } from "@/types"
@@ -23,10 +23,10 @@ export function MessageBubble({ message, isMine, theme }: MessageBubbleProps) {
   const audioTrack = isMine ? "rgba(255,255,255,0.3)" : "rgba(100,116,139,0.3)"
 
   const bubbleClass = isMine
-    ? "bg-primary rounded-2xl rounded-br-md"
-    : "bg-card border border-border rounded-2xl rounded-bl-md"
-  const textClass = isMine ? "text-primary-foreground" : "text-card-foreground"
-  const timeClass = isMine ? "text-primary-foreground/70" : "text-muted-foreground"
+    ? "bg-slate-700 rounded-2xl rounded-br-md"
+    : "bg-slate-800 border border-slate-700 rounded-2xl rounded-bl-md"
+  const textClass = isMine ? "text-white" : "text-slate-100"
+  const timeClass = isMine ? "text-slate-200" : "text-slate-400"
 
   function renderContent() {
     switch (message.type) {
@@ -88,9 +88,17 @@ export function MessageBubble({ message, isMine, theme }: MessageBubbleProps) {
     <View className={`mb-2 max-w-[80%] ${isMine ? "self-end" : "self-start"}`}>
       <View className={`px-3 py-2 ${bubbleClass}`}>
         {renderContent()}
-        <Text className={`mt-1 text-[11px] ${timeClass} ${isMine ? "text-right" : "text-left"}`}>
-          {formatTime(message.createdAt)}
-        </Text>
+        <View className="mt-1 flex-row items-center justify-between">
+          <Text className={`text-[11px] ${timeClass}`}>{formatTime(message.createdAt)}</Text>
+          {isMine ? (
+            <View className="flex-row items-center gap-0.5">
+              <Check size={12} color={message.status === "read" ? "#38bdf8" : "#94a3b8"} />
+              {message.status !== "sent" ? (
+                <Check size={12} color={message.status === "read" ? "#38bdf8" : "#94a3b8"} />
+              ) : null}
+            </View>
+          ) : null}
+        </View>
       </View>
     </View>
   )

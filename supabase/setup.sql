@@ -35,7 +35,20 @@ create table if not exists public.messages (
   type text not null check (type in ('text','image','audio','document')),
   content text not null,
   file_name text,
+  status text not null default 'sent' check (status in ('sent','delivered','read')),
+  delivered_at timestamptz,
+  read_at timestamptz,
   created_at timestamptz default now()
+);
+
+create table if not exists public.conversation_states (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id text not null references public.conversations(id) on delete cascade,
+  user_id text not null,
+  is_typing boolean default false,
+  is_recording boolean default false,
+  updated_at timestamptz default now(),
+  unique (conversation_id, user_id)
 );
 
 create table if not exists public.presence (
