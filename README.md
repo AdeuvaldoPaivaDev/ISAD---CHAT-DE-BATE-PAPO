@@ -38,11 +38,6 @@ Escaneie o QR Code com o Expo Go, ou pressione `a` (Android), `i` (iOS) ou `w` (
 ## Login de teste
 Após rodar o `setup.sql`, use uma das credenciais inseridas:
 
-| Usuário | Senha   |
-|---------|---------|
-| `ana`   | `123456`|
-| `bruno` | `123456`|
-
 > Não há tela de cadastro: novos usuários são adicionados manualmente na tabela `public.users`.
 
 ## Estrutura

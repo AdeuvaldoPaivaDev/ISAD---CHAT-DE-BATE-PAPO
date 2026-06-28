@@ -1,0 +1,43 @@
+{
+  "expo": {
+    "name": "Chat",
+    "slug": "chat-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "chatmobile",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Este app usa o microfone para gravar mensagens de áudio.",
+        "NSPhotoLibraryUsageDescription": "Este app acessa suas fotos para enviar imagens no chat."
+      }
+    },
+    "android": {
+      "permissions": ["RECORD_AUDIO", "READ_EXTERNAL_STORAGE"]
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "O app acessa suas fotos para enviar imagens no chat."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "O app usa o microfone para gravar mensagens de áudio."
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
